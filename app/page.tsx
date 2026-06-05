@@ -9,7 +9,10 @@ import {
 import { macroForSelection, macroTotal, menuItems, restaurants, type Macro, type MenuItem } from "../lib/data";
 
 type Selected = { item: MenuItem; quantity: number };
-type View = "home" | "restaurant";
+type View = "home" | "restaurant" | "picks";
+type MacroPickGoal = "High Protein" | "Low Calorie" | "Low Carb" | "Bulking" | "Best Protein / Calorie";
+type MacroPickItem = { id: string; quantity?: number };
+type MacroPick = { title: string; restaurantId: string; goal: MacroPickGoal; description: string; items: MacroPickItem[]; why: string };
 type MealChoice = { name: string; description: string; baseIds?: string[]; groupLabels?: string[] };
 type BuilderGroup = { label: string; help: string; categories: string[]; variant?: "kids" | "extras"; showWhen?: string[] };
 type BuilderConfig = { meals: MealChoice[]; groups: BuilderGroup[]; tip: string };
@@ -51,6 +54,19 @@ const homeCollections = [
   { label: "Fast food staples", description: "Burgers, chicken, fries", ids: ["mcdonalds", "culvers", "fiveguys", "dairyqueen"] },
   { label: "Coffee and drinks", description: "Coffee, refreshers, shakes", ids: ["starbucks", "dairyqueen", "portillos", "shakeshack"] },
 ] as const;
+const macroPickGoals: MacroPickGoal[] = ["High Protein", "Low Calorie", "Low Carb", "Bulking", "Best Protein / Calorie"];
+const macroPicks: MacroPick[] = [
+  { title: "Double Chicken Lean Bowl", restaurantId: "chipotle", goal: "High Protein", description: "Chicken, extra chicken, fajita veggies, black beans, tomato salsa, and lettuce.", items: [{ id: "chip-chicken", quantity: 2 }, { id: "chip-fajita" }, { id: "chip-black-beans" }, { id: "chip-tomato" }, { id: "chip-lettuce" }], why: "A lot of protein without rice, cheese, sour cream, or guac pushing calories up." },
+  { title: "Chicken Rice Training Bowl", restaurantId: "chipotle", goal: "Bulking", description: "Chicken, white rice, black beans, corn salsa, cheese, and guac.", items: [{ id: "chip-chicken" }, { id: "chip-white-rice" }, { id: "chip-black-beans" }, { id: "chip-corn" }, { id: "chip-cheese" }, { id: "chip-guac" }], why: "A higher-calorie bowl with balanced carbs, fats, and a strong protein base." },
+  { title: "Teriyaki Greens Plate", restaurantId: "panda", goal: "Best Protein / Calorie", description: "Grilled teriyaki chicken with Super Greens.", items: [{ id: "teriyaki" }, { id: "super-greens" }], why: "One of the cleanest Panda combos for protein while keeping calories controlled." },
+  { title: "Grilled Nuggets + Fruit", restaurantId: "chickfila", goal: "High Protein", description: "12-count grilled nuggets, fruit cup, buffalo sauce, and unsweet tea.", items: [{ id: "cfa-nuggets" }, { id: "cfa-fruit" }, { id: "cfa-bbq" }, { id: "cfa-tea" }], why: "Very high protein, low fat, and easy to keep light." },
+  { title: "McDouble No Bun", restaurantId: "mcdonalds", goal: "Low Carb", description: "McDouble with no bun and extra pickles.", items: [{ id: "mcd-mcdouble" }, { id: "mcd-no-bun" }, { id: "mcd-extra-pickles" }], why: "Keeps the burger protein and fat while cutting most of the carbs from the bun." },
+  { title: "Turkey Bacon Coffee Run", restaurantId: "starbucks", goal: "Low Calorie", description: "Turkey bacon egg white sandwich with unsweetened iced coffee.", items: [{ id: "star-turkey-bacon" }, { id: "star-iced-coffee" }], why: "A simple breakfast pick with protein and almost no drink calories." },
+  { title: "Subway Turkey Protein Build", restaurantId: "subway", goal: "High Protein", description: "Wheat bread, turkey, provolone, spinach, cucumber, tomato, and mustard.", items: [{ id: "sub-wheat" }, { id: "sub-turkey-meat", quantity: 2 }, { id: "sub-provolone" }, { id: "sub-spinach" }, { id: "sub-cucumbers" }, { id: "sub-tomatoes" }, { id: "sub-yellow-mustard" }], why: "A classic lean sub pattern that keeps sauces light and protein solid." },
+  { title: "CAVA Steak Greens Bowl", restaurantId: "cava", goal: "Low Carb", description: "SuperGreens, grilled steak, tzatziki, feta, cucumber, pickled onions, and skhug.", items: [{ id: "cava-supergreens" }, { id: "cava-steak" }, { id: "cava-tzatziki" }, { id: "cava-feta" }, { id: "cava-cucumber" }, { id: "cava-pickled-onions" }, { id: "cava-skhug" }], why: "A lower-carb bowl with steak protein and flavorful toppings." },
+  { title: "Portillo's Beef Bowl", restaurantId: "portillos", goal: "Low Carb", description: "Italian Beef Bowl with sweet peppers.", items: [{ id: "portillo-beef-bowl" }, { id: "portillo-sweet-peppers" }], why: "Portillo's flavor without the bread, fries, or shake calories." },
+  { title: "DQ Grilled Chicken Salad", restaurantId: "dairyqueen", goal: "High Protein", description: "Grilled Chicken BLT Salad with a lighter sauce choice.", items: [{ id: "dq-grilled-chicken-salad" }, { id: "dq-bbq-sauce" }], why: "A higher-protein DQ pick that avoids the heavier burger and Blizzard route." },
+];
 
 function Logo({ id, small = false }: { id: string; small?: boolean }) {
   const restaurant = restaurants.find(r => r.id === id)!;
@@ -120,6 +136,11 @@ export default function Home() {
     setRestaurantId(id); setView("restaurant"); setSearch("");
     setSelected([]); setOrderType(null); setJerseySize("Regular"); setSubwaySize("6-inch"); setStarbucksSize("Grande"); window.scrollTo({ top: 0, behavior: "smooth" });
   };
+  const loadMacroPick = (pick: MacroPick) => {
+    setRestaurantId(pick.restaurantId); setView("restaurant"); setSearch("");
+    setSelected(pick.items.map(row => ({ item: menuItems.find(item => item.id === row.id)!, quantity: row.quantity ?? 1 })));
+    setOrderType(null); setJerseySize("Regular"); setSubwaySize("6-inch"); setStarbucksSize("Grande"); window.scrollTo({ top: 0, behavior: "smooth" });
+  };
   const addItem = (item: MenuItem) => setSelected(current => current.some(row => row.item.id === item.id) ? current : [...current, { item, quantity: 1 }]);
   const removeItem = (id: string) => setSelected(current => current.filter(row => row.item.id !== id));
   const updateQuantity = (id: string, quantity: number) => quantity <= 0 ? removeItem(id) : setSelected(current => current.some(row => row.item.id === id) ? current.map(row => row.item.id === id ? { ...row, quantity } : row) : [...current, { item: menuItems.find(item => item.id === id)!, quantity }]);
@@ -129,7 +150,7 @@ export default function Home() {
       <header className="site-header">
         <div className="shell header-inner">
           <button className="logo" onClick={() => setView("home")}><span><Flame size={17} fill="currentColor" /></span>MacroMenu</button>
-          <nav><button onClick={() => setView("home")}>Explore</button><button>Saved meals</button><button>Favorites</button></nav>
+          <nav><button className={view === "home" ? "active" : ""} onClick={() => setView("home")}>Explore</button><button className={view === "picks" ? "active" : ""} onClick={() => setView("picks")}>Macro Picks</button><button>Saved meals</button><button>Favorites</button></nav>
           <div className="header-actions">
             <button className="icon-button" onClick={() => setDark(!dark)} aria-label="Toggle dark mode">{dark ? <Sun size={17}/> : <Moon size={17}/>}</button>
             <button className="login"><UserRound size={16}/> Log in</button>
@@ -196,6 +217,8 @@ export default function Home() {
             </div>
           </section>
         </>
+      ) : view === "picks" ? (
+        <MacroPicks loadMacroPick={loadMacroPick} openRestaurant={openRestaurant}/>
       ) : (
         <>
           <section className="restaurant-hero">
@@ -216,6 +239,76 @@ export default function Home() {
       )}
     </main>
   );
+}
+
+function MacroPicks({ loadMacroPick, openRestaurant }: { loadMacroPick: (pick: MacroPick) => void; openRestaurant: (id: string) => void }) {
+  const [goal, setGoal] = useState<MacroPickGoal | "All">("All");
+  const [restaurantFilter, setRestaurantFilter] = useState("All");
+  const filteredPicks = macroPicks.filter(pick => (goal === "All" || pick.goal === goal) && (restaurantFilter === "All" || pick.restaurantId === restaurantFilter));
+  const pickRestaurants = Array.from(new Set(macroPicks.map(pick => pick.restaurantId)));
+  const pickTotals = (pick: MacroPick) => macroTotal(pick.items.map(row => ({
+    item: menuItems.find(item => item.id === row.id)!,
+    quantity: row.quantity ?? 1,
+  })));
+
+  return <>
+    <section className="picks-hero">
+      <div className="shell picks-hero-inner">
+        <div>
+          <div className="eyebrow"><Sparkles size={14}/> Macro Picks</div>
+          <h1>Good orders, already built.</h1>
+          <p>Browse restaurant meals for high protein, cutting, low carb, bulking, or the best protein per calorie. Each card uses the same menu database as the builder.</p>
+        </div>
+        <div className="picks-score-card">
+          <span>Featured metric</span>
+          <b>Protein per calorie</b>
+          <small>Great for finding meals that are filling without blowing up calories.</small>
+        </div>
+      </div>
+    </section>
+    <section className="shell picks-section">
+      <div className="picks-toolbar">
+        <div>
+          <span className="step-label">SMART FILTERS</span>
+          <h2>Choose your goal</h2>
+        </div>
+        <select value={restaurantFilter} onChange={event => setRestaurantFilter(event.target.value)}>
+          <option value="All">All restaurants</option>
+          {pickRestaurants.map(id => <option key={id} value={id}>{restaurants.find(item => item.id === id)!.name}</option>)}
+        </select>
+      </div>
+      <div className="goal-tabs">
+        {(["All", ...macroPickGoals] as const).map(item => <button className={goal === item ? "active" : ""} onClick={() => setGoal(item)} key={item}>{item}</button>)}
+      </div>
+      <div className="picks-grid">
+        {filteredPicks.map(pick => {
+          const restaurant = restaurants.find(item => item.id === pick.restaurantId)!;
+          const totals = pickTotals(pick);
+          const ratio = totals.calories ? (totals.protein / totals.calories * 100).toFixed(1) : "0.0";
+          return <article className="pick-card" key={pick.title}>
+            <header>
+              <Logo id={pick.restaurantId} small/>
+              <div><span>{pick.goal}</span><h3>{pick.title}</h3><small>{restaurant.name}</small></div>
+            </header>
+            <p>{pick.description}</p>
+            <MacroStats macro={totals}/>
+            <div className="pick-ratio"><b>{ratio}g</b><small>protein per 100 cal</small></div>
+            <div className="pick-items">
+              {pick.items.map(row => {
+                const item = menuItems.find(menuItem => menuItem.id === row.id)!;
+                return <span key={row.id}>{row.quantity && row.quantity > 1 ? `${row.quantity}x ` : ""}{item.name}</span>;
+              })}
+            </div>
+            <footer>
+              <button onClick={() => loadMacroPick(pick)}><Check size={15}/> Use this pick</button>
+              <button onClick={() => openRestaurant(pick.restaurantId)}>Customize <ArrowRight size={15}/></button>
+            </footer>
+            <small className="pick-why"><Sparkles size={12}/> {pick.why}</small>
+          </article>;
+        })}
+      </div>
+    </section>
+  </>;
 }
 
 const builderConfigs: Record<string, BuilderConfig> = {
